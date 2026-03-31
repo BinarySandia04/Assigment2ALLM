@@ -1,0 +1,366 @@
+\documentclass[twocolumn]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{cuted}
+
+\usepackage[backend=biber, sorting=none]{biblatex}
+\addbibresource{test.bib}
+\usepackage{lipsum}
+\usepackage{graphicx}
+\usepackage{subcaption}
+
+\usepackage[top=1in, bottom=1in, left=1.25in, right=1.25in]{geometry}
+
+\usepackage[onehalfspacing]{setspace}
+\usepackage[english]{babel}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumerate, enumitem}
+\usepackage{fancyhdr, graphicx, proof, comment, multicol}
+\usepackage[none]{hyphenat}
+\usepackage{dirtytalk}
+\binoppenalty=\maxdimen
+\relpenalty=\maxdimen
+\usepackage{microtype}
+%\usepackage{mathpazo}
+\usepackage{bbm}
+\usepackage{mdframed}
+\usepackage{parskip}
+\usepackage{pgfgantt}
+\linespread{1.1}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{mathrsfs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{minted}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{mathtools}
+\usepackage[colorlinks=false, linkcolor=black]{hyperref}
+\usepackage[style=numeric,sorting=none,backend=biber]{biblatex}
+
+\renewcommand*{\finalnamedelim}{\addcomma\space}
+% \renewcommand*{\bibnumfmt}[1]{[#1]} % optional: adds square brackets
+
+\title{Generating images from a subset of the ImageNet Dataset using Deep Convolutional Generative Adversarial
+Networks (DCGANs)\\ \\Assigment 2}
+\author{Aran Roig}
+\date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% theorem environments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newtheorem{defn0}{Definition}[section]
+\newtheorem{prop0}[defn0]{Proposition}
+\newtheorem{thm0}[defn0]{Theorem}
+\newtheorem{lemma0}[defn0]{Lemma}
+\newtheorem{corollary0}[defn0]{Corollary}
+\newtheorem{example0}[defn0]{Example}
+\newtheorem{remark0}[defn0]{Remark}
+\newtheorem{conjecture0}[defn0]{Conjecture}
+
+\newenvironment{definition}{ \begin{defn0}}{\end{defn0}}
+\newenvironment{proposition}{\bigskip \begin{prop0}}{\end{prop0}}
+\newenvironment{theorem}{\bigskip \begin{thm0}}{\end{thm0}}
+\newenvironment{lemma}{\bigskip \begin{lemma0}}{\end{lemma0}}
+\newenvironment{corollary}{\bigskip \begin{corollary0}}{\end{corollary0}}
+\newenvironment{example}{ \begin{example0}\rm}{\end{example0}}
+\newenvironment{remark}{ \begin{remark0}\rm}{\end{remark0}}
+\newenvironment{conjecture}{\begin{conjecture0}}{\end{conjecture0}}
+
+\newcommand{\defref}[1]{Definition~\ref{#1}}
+\newcommand{\propref}[1]{Proposition~\ref{#1}}
+\newcommand{\thmref}[1]{Theorem~\ref{#1}}
+\newcommand{\lemref}[1]{Lemma~\ref{#1}}
+\newcommand{\cororef}[1]{Corollary~\ref{#1}}
+\newcommand{\exref}[1]{Example~\ref{#1}}
+\newcommand{\secref}[1]{Section~\ref{#1}}
+\newcommand{\remref}[1]{Remark~\ref{#1}}
+\newcommand{\conjref}[1]{Conjecture~\ref{#1}}
+\DeclarePairedDelimiterX{\norm}[1]{\lVert}{\rVert}{#1}
+
+\begin{document}
+
+\maketitle
+
+\begin{strip}
+\section*{Abstract}
+
+
+Generative Adversarial Networks (GANs) have demonstrated remarkable capacity for
+high-fidelity image synthesis, yet training stability and sample diversity remain
+persistent challenges when scaling to large, semantically heterogeneous datasets. 
+
+In this work, we investigate the use of conditional GANs for image generation on a
+    curated subset of the ImageNet Large Scale Visual Recognition Challenge (ILSVRC) dataset \cite{russakovsky2014imagenet}, 
+comprising 100 classes selected to span a range of visual complexity and intra-class variance.
+
+    Our training pipeline incorporates 
+    a two-timescale update rule (TTUR) to promote generator–discriminator equilibrium. 
+
+    Qualitative analysis further confirms strong semantic coherence and inter-class disentanglement across 
+    generated samples. These findings suggest that targeted subset training is a viable and efficient 
+    strategy for domain-specific generative modeling, with implications for data augmentation, few-shot 
+    learning, and controllable content generation.
+\vspace{1cm}
+\end{strip}
+\section{Introduction}
+
+Generative Adversarial Networks (GANs), introduced by Goodfellow et al. (2014) \cite{goodfellow2014generative} have become one of the most
+widely studied frameworks for image generation. By putting a generator network against a discriminator
+network in a minmax game, GANs are able to learn rich data representations and producing
+visually convincing synthetic images.
+
+Despite the proliferation of incresingly complex GAN architectures in recent literature, the core
+framework remains a powerful and instructive baseline for image synthesis tasks.
+
+In this work we apply a standard deep convolutional GAN (DCGAN) \cite{radford2015unsupervised} to a small subset of the
+ImageNet dataset. A sample of this data can be seen on fig \ref{fig:sample} ImageNet is a large-scale visual database containing over fourteen million
+labeled images spanning thousands of different categories, and the dataset has also served as a
+foundational benchmark for image classification, generation and general computer vision research.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{outputs/sample.png}
+    \caption{Sample images of the used subsets of the ImageNet dataset}
+    \label{fig:sample}
+\end{figure}
+
+Our model employs transposed convolutional layers in the generator to progressively upsample latent vectors
+into full resolution image, while the discriminator uses strided convolutions to learn and
+distinguish real samples from generated samples from the generator. Our goal is evaluating how well
+conceptually a simple GAN architecture can capture the appearance of the structure of real-world categories.
+
+\section{Literature Survey}
+
+\subsection{Preceding Generative models}
+
+GANs emerged in a moment where there were already pre-existing generative models, each with some significant limitations:
+
+\textbf{Restricted Boltzmann Machines} (RBMs) and \textbf{Deep Boltzmann Machines} (DBMs) required
+Markov chan Monte Carlo sampling, making the generation of synthetic data slow and appproximate.
+
+\textbf{Variational Autoencoders (VAEs)} \cite{kingma2019introduction} offered an alternative deep generative framework with
+principled latent variable inference but often produced blurry samples due to pixel-level reconstruction losses.
+
+\textbf{Generative Stochastic Networks (GSNs)} \cite{alain2015gsns} extended denoising autoencoders but relied on complex approximate 
+inference procedures
+
+The GAN framework offered a compelling alternative by sidestepping explicit likelihood estimation, and
+it proposed a trainable method that could produce sharper, more realistic samples.
+
+\subsection{The original GAN model}
+
+The concept of Generative Adversarial Networks was introduced by Ian J. Goodfellow, Jean Pouget-Abadie, Mehdi Mirza,
+Bing Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville and Yoshoua Beingo in 2014. The foundational paper titled
+"Generative Adversarial Nets" \cite{goodfellow2014generative} proposed a framework for training generative models through an adversarial
+process involving two models that competed between each other in a minimax game.
+
+The two models of the GAN are trained simultaneously, each one having a different purpose:
+\begin{itemize}
+    \item A generative model $G$ captures the underlying data distribution of the training set. Its goal is to transform
+        a noise vector $z$, called latent space, into synthetic samples.
+    \item A discriminative model $D$ that estimates the probability that a given sample is coming from real data or if it is synthetic
+        data generated from the generator $G$.
+\end{itemize}
+
+The adversarial objective can be formally expressed as:
+
+$$\min_G \max_D V(D, G) = $$$$ = \mathbb{E}(\log{D(x)}) + \mathbb{E}(\log{(1 - D(G(z)))})$$
+
+This adversarial min max game converges when the generator perfectly recovers the training data distribution
+and the discriminator assigns a probability of $1/2$ to each given sample, so it is unable to discriminate between
+real and synthetic data.
+
+The original implementation of GAN networks used Multilayer Perceptrons (MLPs) as both the generator and the discriminator.
+Experiments were conducted on three datasets:
+
+\begin{itemize}
+    \item The MNIST \cite{lecun1998gradient} dataset, which contains labeled images of handwritten digits
+    \item The Toronto Face Dataset (TFD) \cite{susskind2010tfd}
+    \item The CIFAR-10 natural image dataset \cite{krizhevsky2009learning}
+\end{itemize}
+
+The results of the original paper were promising but limited on image quality, particularly for complex
+natural image domains. It demonstrated the potential of the framework while highlighting the need
+for architectural improvements to scale to richer visual content.
+
+\subsection{Early GAN variants and successors}
+
+\textbf{Conditional GAN (cGAN)}: \cite{mirza2014conditional} Conditional GANs extend the original GAN framework by conditioning both the generator
+and the discriminator on auxiliar information such as class labels. This allowed directed generation of specific
+classes of data, converting the unsupervised formulation into one capable of target synthesis. cGANs demonstrated
+that class dependant image generation could be achieved with a simple architectural extension.
+
+\textbf{Laplacian Pyramid GANs (LAPGAN)}: \cite{denton2015deep} LAPGAN employed a cascade of convolutional networks with
+a Laplacian pyramid framework, generating images in a coarse-to-fine fashion. While LAPGAN achieved visually
+compelling results, the multi-network approach added more complexity. This framework demonstrated
+that convolutional architectures were promising for adversarial image generation, directly motivating
+the development of an unified deep convolutional architecture, that later would become DCGANs.
+
+\subsection{Deep Convolutional Generative Adversarial Netwokrs (DCGAN)}
+
+Despite the theoretical elegance of the original GAN, practical training proved to be difficult. The use of
+fully connected architectures imposed strong independence assumptions, inappropiate for image data. The input data
+of these models needed to have limited resolution because of its dense structure. The original GAN models also
+produced noisy and incoherent outputs over complex training datasets.
+
+The integration of CNNs, which had demonstrated unparalleled feature learning for images in supervised settings (eg. AlexNet,
+VGG or GoogLeNet), into the GAN framework was a natural next step but required some careful architectural design.
+
+DCGANs were first addressed in the paper "Unsupervised Representation Learning with Deep Convolutional Generative Adversarial
+Networks". This paper has since accumulated over 14,000 citations, cementing its status as a landmark contribution in deep learning.
+
+The central contribution of DCGAN is a set of empirically validated architectural guidelines that stabilize
+GAN training when using deep convolutional networks:
+
+\begin{itemize}
+    \item Replace all pooling layers with strided convolutions in the discriminator and fractional-strided (transposed) convolutions
+        in the generator model. This allows both networks to learn their own spatial downsampling and upsampling rather than
+        relying on fixed pooling operations. Strided convolutions preserves more spatial information and allows learning spatial
+        hirearchies.
+    \item Use batch normalization in both the generator and the discriminator. Batch normalization stabilizes training by normalizing
+        the input to each unit, mitigating issues with poor weight initialization and allowing gradients to flow more reliably through
+        deeper networks.
+    \item Remove fully connected hidden layers for deeper architectures. The original GAN models used dense layers to connect
+        the latent vector to the convolutional layers. DCGANs instead connects directly from the latent vector to the first
+        convolutional layer using a reshape operation. This enables a fully convolutional pipeline.
+    \item Use ReLU activation in the generator for all layers except the output, which uses tanh. Use LeakyReLu (with a negative slope
+        of $0.2$) in the discriminator for all layers, with a Sigmoid output for binary classification of real and fake data.
+\end{itemize}
+
+\subsection{Datasets in GAN and DCGAN Research}
+
+The choice of picking a dataset is fundamental to GAN research, as it determines the complexity
+of the distribution function to be learned, the resolution of the data and diversity of the input samples, and
+the applicability of evaluation metrics. Different GAN architectures have been evaluated on progressively more
+challenging datasets as the field has advanced.
+
+\textbf{MNIST and CIFAR-10}. \cite{lecun1998gradient} \cite{krizhevsky2009learning} The MNIST dataset, comprising of $70 000$ grayscale images of handwritten digits
+at $28 \times 28$ resolution was one of the first datasets used to evaluate the original GAN model in $2014$.
+Its simplicity made it an ideal proof-of-concept benchmark. On the other hand, the CIFAR-10 dataset consisted
+of $60 000$ color images across $10$ object classes at $32 \times 32$ resoluton. This dataset provided a more
+challenging benchmark. Both datasets are continued to serve as standard evaluation platforms in deep learning research
+due to their reference metrics and also wide adoption.
+
+\textbf{LSUN - Large-Scale Scene Understanding} \cite{yu2015lsun} The LSUN dataset was one of the three primary datasets
+used to evaluate DCGAN in the original paper. The bedroom susbet contains aproximately 3 million annotated
+scene images, providing a large-scale training corpus. DCGAN trained on LSUN bedrooms was among the first GAN
+models to generate photorealistic interior scenes at a $64 \times 64$ resolution, demonstrating the capability
+of the convolutional adversarial approach.
+
+\textbf{ImageNet-1k} \cite{russakovsky2014imagenet} ImageNet-1k contains approximately $1.2$ million images across $1000$ object categories. It was used
+in the DCGAN paper to evaluate the quality of learned representations for supervised tasks. The discriminator's convolutional
+features were used to train a regularized linear $L2-SVM$ classifier on the CIFAR-10 datset. This classifier achieved
+an $82\%$ accuracy without any fine-tunning, demonstrating the transferability of representations learned using adversarial
+training.
+
+\textbf{Toronto Face Dataset (TFD)} \cite{susskind2010tfd} The Toronto Face Dataset was used in the original GAN paper as an early benchmark
+for face generation. TFD contains approximately $100000$ grayscale facial images representing various expressions
+and identitites. While it served as a foundational role in early GAN evaluations, it has been replaced by larger and
+more diverse datasets such as CelebA and FFHQ for face generation research.
+
+\section{Methodology}
+
+We tested the DCGAN novel architecture against $100$ random classes of the ImageNet dataset. Our objective was to make
+the generator learn the distribution of these $100$ classes, so we can generate synthetic data taken from these subset.
+The implementation was made using the PyTorch python library. Additional libraries such as NumPy handled numerical operations,
+and Matplotlib handled data visualization.
+
+\subsection{Parameters}
+
+Each layer of the generator has a convolutional transpose, followed by a batch normalization and a ReLU activation function.
+It has $5$ of these layers:
+\begin{itemize}
+    \item $\text{ConvTranspose2d}(100 \rightarrow 512, k=4, s=1, p=0)$
+    \item $\text{ConvTranspose2d}(512 \rightarrow 256, k=4, s=2, p=1)$
+    \item $\text{ConvTranspose2d}(256 \rightarrow 128, k=4, s=2, p=1)$
+    \item $\text{ConvTranspose2d}(128 \rightarrow 64, k=4, s=2, p=1)$
+    \item $\text{ConvTranspose2d}(64 \rightarrow 3, k=4, s=2, p=1)$ (Tanh no batchnorm)
+    \item \textbf{Output: }$3 \times 64 \times 64$
+\end{itemize}
+And the discriminator takes as an input the generated image, does some regular convolutions with batch normalization and a LeakyReLU with a negative slope of $0.2$, and finally
+a sigmoid activation function:
+\begin{itemize}
+    \item $\text{Conv2d}(3 \rightarrow 64, k=4, s=2, p=1)$ (No batchnorm)
+    \item $\text{Conv2d}(64 \rightarrow 128, k=4, s=2, p=1)$
+    \item $\text{Conv2d}(128 \rightarrow 256, k=4, s=2, p=1)$
+    \item $\text{Conv2d}(256 \rightarrow 512, k=4, s=2, p=1)$
+    \item $\text{Conv2d}(512 \rightarrow 1, k=4, s=2, p=0)$
+    \item \textbf{Output: }$1$
+\end{itemize}
+
+\section{Experimental results}
+
+We measured the loss of the generator and the discriminator during each epoch of training. The results can be seen on fig. \ref{fig:gen_loss} and \ref{fig:disc_loss}.
+
+An evolution of the model can be seen on the appendix on fig. \ref{fig:evolution}
+
+\section{Conclusions}
+As we can see, DCGANs provide a rich framework model for creating generative models of synthetic data that capture really well the underlying features of the training data,
+and also can achieve good results on approximating the distribution function of the input dataset, as we have seen by training a test DCGAN model over a small slice of
+the ImageNet dataset.
+
+The implementation of the project (and the source of this document) can be found on \url{https://github.com/BinarySandia04/Assigment2ALLM}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{outputs/gen_loss.png}
+    \caption{The generator loss during training.}
+    \label{fig:gen_loss}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{outputs/disc_loss.png}
+    \caption{The discriminator loss during training.}
+    \label{fig:disc_loss}
+\end{figure}
+
+\printbibliography
+
+\appendix
+\onecolumn
+\section{Appendix}
+
+
+\begin{figure*}[th]
+    \centering
+    
+    % First row
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{outputs/epoch_1.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{outputs/epoch_15.png}
+    \end{subfigure}
+
+    \vspace{0.5cm}
+
+    % Second row
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{outputs/epoch_30.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{outputs/epoch_50.png}
+    \end{subfigure}
+
+    \caption{Evolution of the output of the generator over the same noise sample on different epochs.
+    One can see that on later epochs the quality of the synthetic images improves.}
+    \label{fig:evolution}
+\end{figure*}
+
+
+\end{document}
